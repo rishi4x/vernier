@@ -1,11 +1,11 @@
 import AppKit
 
-class OverlayWindow: NSWindow {
+class OverlayWindow: NSPanel {
 
     init(for screen: NSScreen, overlayView: OverlayView) {
         super.init(
             contentRect: screen.frame,
-            styleMask: .borderless,
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -14,6 +14,9 @@ class OverlayWindow: NSWindow {
         self.isOpaque = false
         self.backgroundColor = .clear
         self.level = .screenSaver
+        self.isFloatingPanel = true
+        self.hidesOnDeactivate = false
+        self.becomesKeyOnlyIfNeeded = true
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         self.ignoresMouseEvents = false
         self.acceptsMouseMovedEvents = true
@@ -23,6 +26,7 @@ class OverlayWindow: NSWindow {
         self.initialFirstResponder = overlayView
     }
 
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    // Keep the currently active app focused while this overlay is open.
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
 }

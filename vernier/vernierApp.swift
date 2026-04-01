@@ -16,8 +16,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBar: StatusBarController!
     private var hotkeyManager = HotkeyManager()
     private var overlayWindows: [OverlayWindow] = []
-    private var escGlobalMonitor: Any?
-    private var escLocalMonitor: Any?
+    private var escHotkeyID: UInt32?
     private var delayedRefreshTask: Task<Void, Never>?
     private var measurementSessionID = UUID()
     private let state = MeasurementState()
@@ -27,7 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusBar = StatusBarController()
 
-        hotkeyManager.register(
+        _ = hotkeyManager.register(
             keyCode: UInt32(kVK_ANSI_M),
             modifiers: UInt32(cmdKey | shiftKey)
         ) { [weak self] in
@@ -89,20 +88,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         NSCursor.crosshair.push()
-        NSApp.activate(ignoringOtherApps: true)
-        overlayWindows.first?.makeKeyAndOrderFront(nil)
 
-        // Capture ESC when Vernier is active
-        escLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.keyCode == 53 else { return event }
-            self?.deactivateMeasurement()
-            return nil
-        }
-
-        // Capture ESC when another app still has focus
-        escGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.keyCode == 53 else { return }
-            DispatchQueue.main.async {
+        // Non-activating overlay keeps the current app focused, so use a true
+        // global hotkey for Esc while measurement mode is active.
+        if escHotkeyID == nil {
+            escHotkeyID = hotkeyManager.register(
+                keyCode: UInt32(kVK_Escape),
+                modifiers: 0
+            ) { [weak self] in
                 self?.deactivateMeasurement()
             }
         }
@@ -120,14 +113,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         state.measurementMode = .hover
         state.clearEdges()
 
-        if let monitor = escLocalMonitor {
-            NSEvent.removeMonitor(monitor)
-            escLocalMonitor = nil
-        }
-
-        if let monitor = escGlobalMonitor {
-            NSEvent.removeMonitor(monitor)
-            escGlobalMonitor = nil
+        if let escHotkeyID {
+            hotkeyManager.unregister(hotkeyID: escHotkeyID)
+            self.escHotkeyID = nil
         }
 
         overlayWindows.forEach { $0.orderOut(nil) }
