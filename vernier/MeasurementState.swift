@@ -32,7 +32,8 @@ class MeasurementState {
             return Int(round(abs(cursorPosition.x - anchor.x) * trueScaleX))
         }
         guard let left = nearestLeftEdge, let right = nearestRightEdge else { return nil }
-        return Int(round((right - left) * trueScaleX))
+        // Snap edges are tracked at inclusive pixel indices, so add 1 pixel.
+        return Int(round((right - left) * trueScaleX)) + 1
     }
 
     var verticalPixels: Int? {
@@ -40,7 +41,8 @@ class MeasurementState {
             return Int(round(abs(cursorPosition.y - anchor.y) * trueScaleY))
         }
         guard let top = nearestTopEdge, let bottom = nearestBottomEdge else { return nil }
-        return Int(round((top - bottom) * trueScaleY))
+        // Snap edges are tracked at inclusive pixel indices, so add 1 pixel.
+        return Int(round((top - bottom) * trueScaleY)) + 1
     }
 
     func clearEdges() {
