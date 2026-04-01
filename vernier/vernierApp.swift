@@ -83,7 +83,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             overlayView.frozenFrame = frozenFrame
 
             let window = OverlayWindow(for: screen, overlayView: overlayView)
-            window.orderFrontRegardless()
+            window.makeKeyAndOrderFront(nil)
             return window
         }
 

@@ -27,6 +27,6 @@ class OverlayWindow: NSPanel {
     }
 
     // Keep the currently active app focused while this overlay is open.
-    override var canBecomeKey: Bool { false }
+    override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 }
