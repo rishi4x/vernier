@@ -18,6 +18,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var overlayWindows: [OverlayWindow] = []
     private var escGlobalMonitor: Any?
     private var escLocalMonitor: Any?
+    private var delayedRefreshTask: Task<Void, Never>?
+    private var measurementSessionID = UUID()
     private let state = MeasurementState()
     private let displayManager = DisplayManager()
     private let captureService = ScreenCaptureService()
@@ -45,6 +47,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func activateMeasurement() async {
+        delayedRefreshTask?.cancel()
+        let sessionID = UUID()
+        measurementSessionID = sessionID
+
         state.isActive = true
         state.clearEdges()
         state.measurementMode = .hover
@@ -52,10 +58,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Step 1: Capture ALL screens BEFORE showing any overlay
         var captures: [(NSScreen, CGImage)] = []
+        let excludedWindowIDs = overlayWindowIDs()
         for screen in NSScreen.screens {
             let displayID = screen.displayID
             let scale = screen.backingScaleFactor
-            if let image = await captureService.captureFullScreen(displayID: displayID, scale: scale) {
+            if let image = await captureService.captureFullScreen(
+                displayID: displayID,
+                scale: scale,
+                excludingWindowIDs: excludedWindowIDs
+            ) {
                 captures.append((screen, image))
             }
         }
@@ -95,9 +106,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.deactivateMeasurement()
             }
         }
+
+        scheduleDelayedCaptureRefresh(for: sessionID)
     }
 
     @objc func deactivateMeasurement() {
+        delayedRefreshTask?.cancel()
+        delayedRefreshTask = nil
+
         state.isActive = false
         state.anchorPoint = nil
         state.isDragging = false
@@ -117,5 +133,58 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         overlayWindows.forEach { $0.orderOut(nil) }
         overlayWindows.removeAll()
         NSCursor.pop()
+    }
+
+    private func scheduleDelayedCaptureRefresh(for sessionID: UUID) {
+        delayedRefreshTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 1_500_000_000)
+            } catch {
+                return
+            }
+
+            guard let self, !Task.isCancelled else { return }
+            guard self.state.isActive, self.measurementSessionID == sessionID else { return }
+
+            let excludedWindowIDs = await MainActor.run { self.overlayWindowIDs() }
+            var capturesByDisplayID: [CGDirectDisplayID: CGImage] = [:]
+            for screen in NSScreen.screens {
+                let displayID = screen.displayID
+                let scale = screen.backingScaleFactor
+                if let image = await self.captureService.captureFullScreen(
+                    displayID: displayID,
+                    scale: scale,
+                    excludingWindowIDs: excludedWindowIDs
+                ) {
+                    capturesByDisplayID[displayID] = image
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard self.state.isActive, self.measurementSessionID == sessionID else { return }
+
+                for window in self.overlayWindows {
+                    guard
+                        let overlayView = window.contentView as? OverlayView,
+                        let image = capturesByDisplayID[overlayView.screen.displayID],
+                        let refreshedFrame = FrozenFrame(cgImage: image)
+                    else { continue }
+
+                    overlayView.frozenFrame = refreshedFrame
+                    overlayView.needsDisplay = true
+                }
+            }
+        }
+    }
+
+    private func overlayWindowIDs() -> Set<CGWindowID> {
+        Set(
+            overlayWindows.compactMap { window in
+                let number = window.windowNumber
+                guard number > 0 else { return nil }
+                return CGWindowID(number)
+            }
+        )
     }
 }
