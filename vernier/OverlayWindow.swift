@@ -20,6 +20,7 @@ class OverlayWindow: NSWindow {
         self.hasShadow = false
         self.isReleasedWhenClosed = false
         self.contentView = overlayView
+        self.initialFirstResponder = overlayView
     }
 
     override var canBecomeKey: Bool { true }

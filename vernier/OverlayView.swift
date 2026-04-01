@@ -4,6 +4,7 @@ class OverlayView: NSView {
     let state: MeasurementState
     let screen: NSScreen
     private let displayManager: DisplayManager
+    private let onEscape: () -> Void
 
     /// Pre-built pixel buffer from frozen screenshot for instant edge lookups.
     var frozenFrame: FrozenFrame?
@@ -11,10 +12,16 @@ class OverlayView: NSView {
     private let rulerColor = NSColor.systemBlue
     private let labelFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
 
-    init(state: MeasurementState, screen: NSScreen, displayManager: DisplayManager) {
+    init(
+        state: MeasurementState,
+        screen: NSScreen,
+        displayManager: DisplayManager,
+        onEscape: @escaping () -> Void = {}
+    ) {
         self.state = state
         self.screen = screen
         self.displayManager = displayManager
+        self.onEscape = onEscape
         super.init(frame: screen.frame)
     }
 
@@ -39,6 +46,9 @@ class OverlayView: NSView {
     // MARK: - Mouse Events
 
     override func mouseMoved(with event: NSEvent) {
+        // Don't update while a finished measurement box is displayed
+        if state.measurementMode == .measuring, !state.isDragging { return }
+
         let screenPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? event.locationInWindow
         state.cursorPosition = screenPoint
         state.activeScreen = screen
@@ -47,9 +57,6 @@ class OverlayView: NSView {
         if let frame = frozenFrame {
             let screenFrame = screen.frame
 
-            // Calculate true scale from actual image dimensions vs screen points.
-            // This handles scaled resolutions ("More Space" etc.) where
-            // backingScaleFactor doesn't match actual captured pixel count.
             let scaleX = CGFloat(frame.width) / screenFrame.width
             let scaleY = CGFloat(frame.height) / screenFrame.height
             state.trueScaleX = scaleX
@@ -58,13 +65,11 @@ class OverlayView: NSView {
             let localX = screenPoint.x - screenFrame.origin.x
             let localY = screenPoint.y - screenFrame.origin.y
 
-            // Convert to image pixel coords (top-left origin)
             let pixelX = Int(localX * scaleX)
             let pixelY = Int((screenFrame.height - localY) * scaleY)
 
             let edges = frame.findEdges(fromX: pixelX, fromY: pixelY)
 
-            // Convert edge pixel positions back to global AppKit screen points
             state.nearestLeftEdge = edges.left.map { screenFrame.origin.x + $0 / scaleX }
             state.nearestRightEdge = edges.right.map { screenFrame.origin.x + $0 / scaleX }
             state.nearestTopEdge = edges.top.map { screenFrame.origin.y + screenFrame.height - $0 / scaleY }
@@ -76,25 +81,52 @@ class OverlayView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let screenPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? event.locationInWindow
-
-        if state.measurementMode == .hover {
-            state.anchorPoint = screenPoint
-            state.measurementMode = .measuring
-        } else {
-            state.measurementMode = .hover
-            state.anchorPoint = nil
-        }
+        state.anchorPoint = screenPoint
+        state.cursorPosition = screenPoint
+        state.activeScreen = screen
+        state.measurementMode = .measuring
+        state.isDragging = true
+        window?.makeFirstResponder(self)
         needsDisplay = true
     }
 
-    override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { // ESC
-            state.isActive = false
-            NSApp.sendAction(#selector(AppDelegate.deactivateMeasurement), to: nil, from: self)
-        }
+    override func mouseDragged(with event: NSEvent) {
+        let screenPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? event.locationInWindow
+        state.cursorPosition = screenPoint
+        state.activeScreen = screen
+        needsDisplay = true
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        let screenPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? event.locationInWindow
+        state.cursorPosition = screenPoint
+        state.activeScreen = screen
+        state.measurementMode = .hover
+        state.anchorPoint = nil
+        state.isDragging = false
+        needsDisplay = true
     }
 
     override var acceptsFirstResponder: Bool { true }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.makeFirstResponder(self)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 { // Escape
+            onEscape()
+            return
+        }
+        super.keyDown(with: event)
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        onEscape()
+    }
 
     // MARK: - Drawing
 

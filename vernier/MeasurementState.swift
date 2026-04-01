@@ -20,6 +20,7 @@ class MeasurementState {
     // Click-to-measure
     var anchorPoint: CGPoint? = nil
     var measurementMode: MeasurementMode = .hover
+    var isDragging: Bool = false
 
     // True scale derived from captured image dimensions / screen points.
     // Set by OverlayView when the frozen frame is loaded.
