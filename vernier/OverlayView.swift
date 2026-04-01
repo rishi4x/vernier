@@ -143,7 +143,7 @@ class OverlayView: NSView {
 
         if state.measurementMode == .measuring, let anchor = state.anchorPoint {
             drawManualMeasurement(cursor: cursorLocal, anchor: anchor, screenFrame: screenFrame, scale: scale)
-        } else {
+        } else if state.activeScreen?.displayID == screen.displayID {
             drawSnapMeasurement(cursor: cursorLocal, screenFrame: screenFrame, scale: scale)
         }
     }
@@ -154,7 +154,9 @@ class OverlayView: NSView {
         let rulerStroke = rulerColor.withAlphaComponent(0.9)
 
         // Horizontal ruler
-        if let left = state.nearestLeftEdge, let right = state.nearestRightEdge {
+        if state.nearestLeftEdge != nil || state.nearestRightEdge != nil {
+            let left = state.nearestLeftEdge ?? screenFrame.minX
+            let right = state.nearestRightEdge ?? screenFrame.maxX
             let localLeft = left - screenFrame.origin.x
             let localRight = right - screenFrame.origin.x
 
@@ -171,13 +173,16 @@ class OverlayView: NSView {
             drawTickMark(at: CGPoint(x: localRight, y: cursor.y), vertical: true)
 
             // Pixel label
-            if let pixels = state.horizontalPixels, pixels > 0 {
+            let pixels = Int(round((right - left) * state.trueScaleX)) + 1
+            if pixels > 0 {
                 drawPillLabel("\(pixels)px", at: CGPoint(x: (localLeft + localRight) / 2, y: cursor.y + 16))
             }
         }
 
         // Vertical ruler
-        if let top = state.nearestTopEdge, let bottom = state.nearestBottomEdge {
+        if state.nearestTopEdge != nil || state.nearestBottomEdge != nil {
+            let top = state.nearestTopEdge ?? screenFrame.maxY
+            let bottom = state.nearestBottomEdge ?? screenFrame.minY
             let localTop = top - screenFrame.origin.y
             let localBottom = bottom - screenFrame.origin.y
 
@@ -191,7 +196,8 @@ class OverlayView: NSView {
             drawTickMark(at: CGPoint(x: cursor.x, y: localTop), vertical: false)
             drawTickMark(at: CGPoint(x: cursor.x, y: localBottom), vertical: false)
 
-            if let pixels = state.verticalPixels, pixels > 0 {
+            let pixels = Int(round((top - bottom) * state.trueScaleY)) + 1
+            if pixels > 0 {
                 drawPillLabel("\(pixels)px", at: CGPoint(x: cursor.x + 16, y: (localTop + localBottom) / 2))
             }
         }
