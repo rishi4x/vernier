@@ -9,7 +9,7 @@ class OverlayView: NSView {
     /// Pre-built pixel buffer from frozen screenshot for instant edge lookups.
     var frozenFrame: FrozenFrame?
 
-    private let rulerColor = NSColor.systemBlue
+    private let rulerColor = NSColor.systemRed
     private let labelFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
 
     init(
