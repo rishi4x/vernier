@@ -12,7 +12,9 @@ class StatusBarController {
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Measure", action: #selector(AppDelegate.toggleMeasurement), keyEquivalent: "")
-        menu.items.last?.keyEquivalentModifierMask = [.command, .shift]
+        menu.addItem(.separator())
+        let settingsItem = NSMenuItem(title: "Settings\u{2026}", action: #selector(AppDelegate.openSettings), keyEquivalent: ",")
+        menu.addItem(settingsItem)
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Vernier", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu

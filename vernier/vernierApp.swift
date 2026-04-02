@@ -1,5 +1,6 @@
 import SwiftUI
 import Carbon
+import KeyboardShortcuts
 
 @main
 struct VernierApp: App {
@@ -22,18 +23,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let state = MeasurementState()
     private let displayManager = DisplayManager()
     private let captureService = ScreenCaptureService()
+    private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusBar = StatusBarController()
 
-        _ = hotkeyManager.register(
-            keyCode: UInt32(kVK_ANSI_M),
-            modifiers: UInt32(cmdKey | shiftKey)
-        ) { [weak self] in
+        KeyboardShortcuts.onKeyUp(for: .toggleMeasurement) { [weak self] in
             self?.toggleMeasurement()
         }
 
         Task { _ = await captureService.requestPermission() }
+    }
+
+    @objc func openSettings() {
+        if let settingsWindow, settingsWindow.isVisible {
+            settingsWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 100),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Vernier Settings"
+        window.contentView = NSHostingView(rootView: SettingsView())
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.level = .floating
+        self.settingsWindow = window
+
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc func toggleMeasurement() {

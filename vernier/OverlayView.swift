@@ -114,6 +114,35 @@ class OverlayView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
+        seedCursorPosition()
+    }
+
+    func seedCursorPosition() {
+        let screenPoint = NSEvent.mouseLocation
+        guard screen.frame.contains(screenPoint) else { return }
+        state.cursorPosition = screenPoint
+        state.activeScreen = screen
+
+        if let frame = frozenFrame {
+            let screenFrame = screen.frame
+            let scaleX = CGFloat(frame.width) / screenFrame.width
+            let scaleY = CGFloat(frame.height) / screenFrame.height
+            state.trueScaleX = scaleX
+            state.trueScaleY = scaleY
+
+            let localX = screenPoint.x - screenFrame.origin.x
+            let localY = screenPoint.y - screenFrame.origin.y
+            let pixelX = Int(localX * scaleX)
+            let pixelY = Int((screenFrame.height - localY) * scaleY)
+
+            let edges = frame.findEdges(fromX: pixelX, fromY: pixelY)
+            state.nearestLeftEdge = edges.left.map { screenFrame.origin.x + $0 / scaleX }
+            state.nearestRightEdge = edges.right.map { screenFrame.origin.x + $0 / scaleX }
+            state.nearestTopEdge = edges.top.map { screenFrame.origin.y + screenFrame.height - $0 / scaleY }
+            state.nearestBottomEdge = edges.bottom.map { screenFrame.origin.y + screenFrame.height - $0 / scaleY }
+        }
+
+        needsDisplay = true
     }
 
     override func keyDown(with event: NSEvent) {
