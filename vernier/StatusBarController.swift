@@ -7,7 +7,12 @@ class StatusBarController {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "ruler", accessibilityDescription: "Vernier")
+            let image = NSImage(named: "MenuBarIcon")
+                ?? NSImage(systemSymbolName: "ruler", accessibilityDescription: "Vernier")
+            image?.isTemplate = true
+            image?.size = NSSize(width: 18, height: 18)
+            button.image = image
+            button.imagePosition = .imageOnly
         }
 
         let menu = NSMenu()
