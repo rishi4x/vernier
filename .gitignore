@@ -1,0 +1,15 @@
+# Xcode user state
+*.xcuserstate
+xcuserdata/
+
+# Build output
+DerivedData/
+build/
+dist/
+
+# Signing/private files
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.developerprofile
